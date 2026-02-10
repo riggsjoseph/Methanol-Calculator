@@ -315,11 +315,11 @@ st.set_page_config(
 # Title
 st.title("Permian Methanol Injection Calculator")
 
-# Create two columns: inputs on left, results on right
-left_col, right_col = st.columns([1, 2])
+# Create three columns: inputs on left, results in center, chart on right
+left_col, center_col, right_col = st.columns([1, 1, 2])
 
 with left_col:
-    st.subheader("Input Parameters")
+    st.subheader("Inputs")
 
     gas_rate = st.number_input(
         "Gas Rate (MMscf/day)",
@@ -358,49 +358,41 @@ with left_col:
         help="Lowest expected downstream pressure"
     )
 
-with right_col:
-    st.subheader("Results")
-
-    # Validate inputs and calculate
-    if upstream_pressure <= downstream_pressure:
+# Validate inputs and calculate
+if upstream_pressure <= downstream_pressure:
+    with center_col:
+        st.subheader("Results")
         st.error("Upstream pressure must be greater than downstream pressure.")
-    elif gas_rate <= 0:
+elif gas_rate <= 0:
+    with center_col:
+        st.subheader("Results")
         st.error("Gas rate must be greater than zero.")
-    else:
-        # Perform calculation
-        result = calculate_methanol_rate(
-            temperature, upstream_pressure, downstream_pressure, gas_rate
-        )
+else:
+    # Perform calculation
+    result = calculate_methanol_rate(
+        temperature, upstream_pressure, downstream_pressure, gas_rate
+    )
+
+    with center_col:
+        st.subheader("Results")
 
         if result["status"] == "error":
             st.error(result["error"])
             if result["t2"] is not None:
                 st.metric("Adjusted Temperature (T2)", f"{result['t2']:.1f} °F")
-                fig = create_hydrate_chart(result, downstream_pressure)
-                st.plotly_chart(fig, use_container_width=True)
 
         elif result["status"] == "no_methanol":
             st.success("No methanol injection required!")
-            col1, col2 = st.columns(2)
-            with col1:
-                st.metric("Methanol Rate", "0 gal/day")
-            with col2:
-                st.metric("Adjusted Temperature (T2)", f"{result['t2']:.1f} °F")
-
-            fig = create_hydrate_chart(result, downstream_pressure)
-            st.plotly_chart(fig, use_container_width=True)
+            st.metric("Methanol Rate", "0 gal/day")
+            st.metric("Adjusted Temperature (T2)", f"{result['t2']:.1f} °F")
 
         else:
-            # Display metrics in a row
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                st.metric("Required Methanol Rate", f"{result['rate']:.2f} gal/day")
-            with col2:
-                st.metric("Adjusted Temp (T2)", f"{result['t2']:.1f} °F")
-            with col3:
-                st.metric("Rate per MMscf", f"{result['methanol_per_mmscf']:.2f} gal/MMscf")
+            st.metric("Required Methanol Rate", f"{result['rate']:.2f} gal/day")
+            st.metric("Adjusted Temp (T2)", f"{result['t2']:.1f} °F")
+            st.metric("Rate per MMscf", f"{result['methanol_per_mmscf']:.2f} gal/MMscf")
 
-            # Show chart
-            fig = create_hydrate_chart(result, downstream_pressure)
-            st.plotly_chart(fig, use_container_width=True)
-            st.caption("The red X marks the operating point (T2 and downstream pressure).")
+    with right_col:
+        st.subheader("Hydrate Curves")
+        fig = create_hydrate_chart(result, downstream_pressure)
+        st.plotly_chart(fig, use_container_width=True)
+        st.caption("Red X = operating point")
