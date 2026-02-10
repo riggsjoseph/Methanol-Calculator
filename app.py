@@ -309,61 +309,59 @@ def calculate_methanol_rate(temperature, upstream_pressure, downstream_pressure,
 st.set_page_config(
     page_title="Methanol Injection Calculator",
     page_icon="🧪",
-    layout="centered"
+    layout="wide"
 )
 
 # Title
 st.title("Permian Methanol Injection Calculator")
-st.markdown("Calculate required methanol injection rates to prevent hydrate formation.")
-st.caption("Based on Permian Hydrate Curves data")
 
-st.divider()
+# Create two columns: inputs on left, results on right
+left_col, right_col = st.columns([1, 2])
 
-# Input section
-st.subheader("Input Parameters")
+with left_col:
+    st.subheader("Input Parameters")
 
-gas_rate = st.number_input(
-    "Gas Rate (MMscf/day)",
-    min_value=0.0,
-    max_value=1000.0,
-    value=1.0,
-    step=0.1,
-    format="%.2f",
-    help="Highest expected gas rate"
-)
+    gas_rate = st.number_input(
+        "Gas Rate (MMscf/day)",
+        min_value=0.0,
+        max_value=1000.0,
+        value=1.0,
+        step=0.1,
+        format="%.2f",
+        help="Highest expected gas rate"
+    )
 
-temperature = st.number_input(
-    "Lowest Upstream Temperature (°F)",
-    min_value=-50.0,
-    max_value=150.0,
-    value=80.0,
-    step=1.0,
-    help="Lowest expected upstream temperature"
-)
+    temperature = st.number_input(
+        "Lowest Upstream Temperature (°F)",
+        min_value=-50.0,
+        max_value=150.0,
+        value=80.0,
+        step=1.0,
+        help="Lowest expected upstream temperature"
+    )
 
-upstream_pressure = st.number_input(
-    "Highest Upstream Pressure (PSIG)",
-    min_value=0.0,
-    max_value=5000.0,
-    value=1100.0,
-    step=25.0,
-    help="Highest expected upstream pressure"
-)
+    upstream_pressure = st.number_input(
+        "Highest Upstream Pressure (PSIG)",
+        min_value=0.0,
+        max_value=5000.0,
+        value=1100.0,
+        step=25.0,
+        help="Highest expected upstream pressure"
+    )
 
-downstream_pressure = st.number_input(
-    "Lowest Downstream Pressure (PSIG)",
-    min_value=0.0,
-    max_value=1500.0,
-    value=500.0,
-    step=25.0,
-    help="Lowest expected downstream pressure"
-)
+    downstream_pressure = st.number_input(
+        "Lowest Downstream Pressure (PSIG)",
+        min_value=0.0,
+        max_value=1500.0,
+        value=500.0,
+        step=25.0,
+        help="Lowest expected downstream pressure"
+    )
 
-st.divider()
+with right_col:
+    st.subheader("Results")
 
-# Calculate button
-if st.button("Calculate Methanol Rate", type="primary", use_container_width=True):
-    # Validate inputs
+    # Validate inputs and calculate
     if upstream_pressure <= downstream_pressure:
         st.error("Upstream pressure must be greater than downstream pressure.")
     elif gas_rate <= 0:
@@ -374,14 +372,10 @@ if st.button("Calculate Methanol Rate", type="primary", use_container_width=True
             temperature, upstream_pressure, downstream_pressure, gas_rate
         )
 
-        st.subheader("Results")
-
         if result["status"] == "error":
             st.error(result["error"])
             if result["t2"] is not None:
                 st.metric("Adjusted Temperature (T2)", f"{result['t2']:.1f} °F")
-                # Show chart even on error
-                st.subheader("Hydrate Curves")
                 fig = create_hydrate_chart(result, downstream_pressure)
                 st.plotly_chart(fig, use_container_width=True)
 
@@ -392,60 +386,21 @@ if st.button("Calculate Methanol Rate", type="primary", use_container_width=True
                 st.metric("Methanol Rate", "0 gal/day")
             with col2:
                 st.metric("Adjusted Temperature (T2)", f"{result['t2']:.1f} °F")
-            st.info("The adjusted temperature is above the hydrate formation threshold.")
 
-            # Show chart
-            st.subheader("Hydrate Curves")
             fig = create_hydrate_chart(result, downstream_pressure)
             st.plotly_chart(fig, use_container_width=True)
 
         else:
-            # Display main result
-            st.metric(
-                label="Required Methanol Rate",
-                value=f"{result['rate']:.2f} gal/day"
-            )
-
-            # Display calculation details
-            st.subheader("Calculation Details")
-            col1, col2 = st.columns(2)
-
+            # Display metrics in a row
+            col1, col2, col3 = st.columns(3)
             with col1:
-                st.metric("Adjusted Temp (T2)", f"{result['t2']:.1f} °F")
+                st.metric("Required Methanol Rate", f"{result['rate']:.2f} gal/day")
             with col2:
-                st.metric("Methanol Rate", f"{result['methanol_per_mmscf']:.2f} gal/MMscf")
+                st.metric("Adjusted Temp (T2)", f"{result['t2']:.1f} °F")
+            with col3:
+                st.metric("Rate per MMscf", f"{result['methanol_per_mmscf']:.2f} gal/MMscf")
 
             # Show chart
-            st.subheader("Hydrate Curves")
             fig = create_hydrate_chart(result, downstream_pressure)
             st.plotly_chart(fig, use_container_width=True)
-            st.caption("The red X marks the operating point (T2 and downstream pressure). The required methanol rate is interpolated between the curves.")
-
-            # Explanation
-            with st.expander("How is this calculated?"):
-                st.markdown(f"""
-                **Step 1: Calculate Adjusted Temperature (T2)**
-                - Accounts for Joule-Thomson cooling through the choke
-                - T2 = {temperature}°F - ({upstream_pressure} - {downstream_pressure})/100 × 8
-                - T2 = **{result['t2']:.1f}°F**
-
-                **Step 2: Interpolate Hydrate Curves**
-                - At {downstream_pressure + 14.7:.0f} psia, hydrate formation temperatures:
-                """)
-
-                for rate in METHANOL_RATES:
-                    temp = result["hydrate_temps"][rate]
-                    marker = " ← T2 falls here" if rate == int(result["methanol_per_mmscf"] // 2) * 2 + 2 else ""
-                    st.markdown(f"  - {rate} gal/MMscf: {temp:.1f}°F{marker}")
-
-                st.markdown(f"""
-                - Interpolated rate: **{result['methanol_per_mmscf']:.2f} gal/MMscf**
-
-                **Step 3: Calculate Final Rate**
-                - Methanol Rate = {result['methanol_per_mmscf']:.2f} × {gas_rate} MMscf/day
-                - Methanol Rate = **{result['rate']:.2f} gal/day**
-                """)
-
-# Footer
-st.divider()
-st.caption("Based on the Permian Hydrate Curves from the methanol injection calculator spreadsheet.")
+            st.caption("The red X marks the operating point (T2 and downstream pressure).")
